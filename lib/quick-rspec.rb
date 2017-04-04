@@ -8,8 +8,10 @@ class QuickRspec < Rails::Railtie
   end
 
   class << self
+    @@threads = []
     @@coverage = {}
     @@last_cover = {}
+    @@mutex = Mutex.new
 
     def start
       Coverage.start
@@ -20,21 +22,25 @@ class QuickRspec < Rails::Railtie
       root = Rails.root.to_s
       result = {}
       cover = Coverage.peek_result
-      cover.each do |path, coverage|
-        next unless path =~ %r{^#{Regexp.escape(root)}}i
-        next if path =~ %r{^#{Regexp.escape(root)}\/spec\/}i
-        last_cover = @@last_cover[path]
-        path = QuickRspec.relevant_path(path)
-        coverage = coverage.each_with_index.map.map do |count, index|
-          count -= last_cover[index] if count.present? && last_cover.present? && last_cover[index].present?
-          index if count&.positive?
-        end
-        coverage.compact!
-        next unless coverage.any?
-        result[path] = coverage
-      end
-      @@coverage[spec] = result
+      prev_cover = @@last_cover
       @@last_cover = cover
+      @@threads << Thread.new do
+        cover.each do |path, coverage|
+          next unless path =~ %r{^#{Regexp.escape(root)}}i
+          next if path =~ %r{^#{Regexp.escape(root)}\/spec\/}i
+          last_cover = prev_cover[path]
+          path = QuickRspec.relevant_path(path)
+          coverage = coverage.each_with_index.map.map do |count, index|
+            index unless last_cover.present? && count == last_cover[index]
+          end
+          coverage.compact!
+          next unless coverage.any?
+          result[path] = coverage
+        end
+        @@mutex.synchronize do
+          @@coverage[spec] = result
+        end
+      end
     end
 
     def relevant_path(path)
@@ -45,16 +51,23 @@ class QuickRspec < Rails::Railtie
     def load_stats
       @@coverage = begin
                      JSON.parse(File.read(Rails.root.join('tmp/quick_rspec.new.json')))
-                   rescue Errno::ENOENT
+                   rescue Errno::ENOENT, JSON::ParserError
                      begin
                        JSON.parse(File.read(Rails.root.join('tmp/quick_rspec.json')))
-                     rescue Errno::ENOENT
+                     rescue Errno::ENOENT, JSON::ParserError
                        {}
                      end
                    end
     end
 
     def save_stats
+      new_coverage = @@coverage
+      load_stats()
+      new_coverage.each do |spec, coverage|
+        @@coverage[spec] = coverage
+      end
+      dir = Rails.root.join('tmp')
+      FileUtils.mkdir_p(dir) unless File.directory?(dir)
       File.open(Rails.root.join('tmp/quick_rspec.new.json'), 'w+') do |f|
         f.write @@coverage.to_json
       end
@@ -75,12 +88,15 @@ class QuickRspec < Rails::Railtie
         spec
       end.compact
     end
+
+    def on_exit
+      @@threads.map(&:join)
+      QuickRspec.save_stats
+    end
   end
 end
 
 if Rails.env.test?
-  QuickRspec.load_stats
-
   QuickRspec.start
 
   RSpec.configure do |config|
@@ -89,5 +105,5 @@ if Rails.env.test?
     end
   end
 
-  at_exit { QuickRspec.save_stats }
+  at_exit { QuickRspec.on_exit }
 end
