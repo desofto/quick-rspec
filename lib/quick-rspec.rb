@@ -26,8 +26,7 @@ class QuickRspec < Rails::Railtie
       @@last_cover = cover
       @@threads << Thread.new do
         cover.each do |path, coverage|
-          next unless path =~ %r{^#{Regexp.escape(root)}}i
-          next if path =~ %r{^#{Regexp.escape(root)}\/spec\/}i
+          next unless path =~ %r{^#{Regexp.escape(root)}\/(app|lib|config)\/.*\.rb}i
           last_cover = prev_cover[path]
           path = QuickRspec.relevant_path(path)
           coverage = coverage.each_with_index.map.map do |count, index|
