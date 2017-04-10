@@ -9,7 +9,7 @@ task quick_rspec: :environment do
   specs = []
 
   files = `git diff --name-only`.split("\n")
-  files.select! { |file| file =~ %r{^(app|lib|config|spec)\/}i }
+  files.select! { |file| file =~ %r{^(app|lib|config|spec)\/.*\.rb}i }
 
   files.each do |file|
     if file =~ %r{^spec\/}i

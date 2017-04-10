@@ -5,7 +5,7 @@ $LOAD_PATH.unshift(lib) unless $LOAD_PATH.include?(lib)
 Gem::Specification.new do |spec|
   spec.required_ruby_version = '>= 2.3'
   spec.name          = "quick-rspec"
-  spec.version       = "0.1.6"
+  spec.version       = "0.1.7"
   spec.authors       = ["Dmitry Silchenko"]
   spec.email         = ["dmitry@desofto.com"]
 
