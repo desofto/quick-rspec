@@ -7,7 +7,7 @@
 Add this line to your application's Gemfile:
 
 ```ruby
-gem 'quick-rspec', require: false, group: [:test, :development]
+gem 'quick-rspec', require: false
 ```
 
 Add this line at the end of your `config/application.rb`
