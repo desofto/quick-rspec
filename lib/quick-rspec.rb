@@ -28,12 +28,13 @@ class QuickRspec < Rails::Railtie
         cover.each do |path, coverage|
           next unless path =~ %r{^#{Regexp.escape(root)}\/(app|lib|config)\/.*\.rb}i
           last_cover = prev_cover[path]
-          path = QuickRspec.relevant_path(path)
+          next if coverage == last_cover
           coverage = coverage.each_with_index.map.map do |count, index|
             index unless last_cover.present? && count == last_cover[index]
           end
           coverage.compact!
           next unless coverage.any?
+          path = QuickRspec.relevant_path(path)
           result[path] = coverage
         end
         @@mutex.synchronize do
